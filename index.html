@@ -98,4 +98,128 @@
     const firebaseConfig = {
         apiKey: "AIzaSyAEJfSyTNlcm3uKoC8nqKBzkBjfzmNq-0s",
         authDomain: "lesleycalendar-59702.firebaseapp.com",
-        databaseURL: "https://lesleycalendar-597
+        databaseURL: "https://lesleycalendar-59702-default-rtdb.firebaseio.com",
+        projectId: "lesleycalendar-59702",
+        storageBucket: "lesleycalendar-59702.firebasestorage.app",
+        messagingSenderId: "206794990386",
+        appId: "1:206794990386:web:dcda160656a516cd7fad2b"
+    };
+
+    var db;
+    var allEvents = {};
+    var currentView = new Date();
+    var selectedDateId = "";
+
+    // 1. Initialize Firebase
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        
+        // 2. Listen for Data
+        db.ref("events").on("value", (snapshot) => {
+            allEvents = snapshot.val() || {};
+            document.getElementById("syncStatus").innerText = "Cloud Synced ✅";
+            drawCalendar();
+        }, (error) => {
+            console.error(error);
+            document.getElementById("syncStatus").innerText = "Offline Mode (Local)";
+            loadLocal();
+        });
+    } catch(e) {
+        document.getElementById("syncStatus").innerText = "Firebase Error";
+        loadLocal();
+    }
+
+    function loadLocal() {
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.includes("-")) { 
+                allEvents[key] = localStorage.getItem(key);
+            }
+        }
+        drawCalendar();
+    }
+
+    function drawCalendar() {
+        var year = currentView.getFullYear();
+        var month = currentView.getMonth();
+        var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        document.getElementById("monthTitle").innerText = monthNames[month] + " " + year;
+
+        var firstDay = new Date(year, month, 1).getDay();
+        var offset = (firstDay === 0) ? 6 : firstDay - 1; 
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        var gridHtml = "";
+        for (var i = 0; i < offset; i++) {
+            gridHtml += "<div class='day-btn' style='visibility:hidden'></div>";
+        }
+
+        for (var day = 1; day <= daysInMonth; day++) {
+            var dateId = year + "-" + (month + 1) + "-" + day;
+            var dayOfWeek = new Date(year, month, day).getDay();
+            
+            var classes = "day-btn";
+            if (dayOfWeek === 0 || dayOfWeek === 6) { classes += " weekend"; }
+            
+            var content = allEvents[dateId] || "";
+            if (content.trim() !== "") { classes += " has-event"; }
+            
+            var today = new Date();
+            if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                classes += " today";
+            }
+
+            gridHtml += "<button class='" + classes + "' onclick='openPopup(\"" + dateId + "\", " + day + ")'>" + day + "</button>";
+        }
+        document.getElementById("calendarGrid").innerHTML = gridHtml;
+    }
+
+    function move(n) {
+        currentView.setMonth(currentView.getMonth() + n);
+        drawCalendar();
+    }
+
+    function goToToday() {
+        currentView = new Date();
+        drawCalendar();
+    }
+
+    // --- Event Popup Logic ---
+    function openPopup(id, dayNum) {
+        selectedDateId = id;
+        var monthName = document.getElementById("monthTitle").innerText.split(" ")[0];
+        document.getElementById("popupDate").innerText = dayNum + " " + monthName;
+        document.getElementById("eventText").value = allEvents[id] || "";
+        document.getElementById("popup").style.display = "flex";
+        document.getElementById("eventText").focus();
+    }
+
+    function saveEvent() {
+        var text = document.getElementById("eventText").value;
+        allEvents[selectedDateId] = text;
+        localStorage.setItem(selectedDateId, text);
+        
+        if (db) {
+            db.ref("events/" + selectedDateId).set(text)
+              .catch((e) => alert("Cloud save failed: " + e.message));
+        }
+        closePopup();
+        drawCalendar();
+    }
+
+    function closePopup() {
+        document.getElementById("popup").style.display = "none";
+    }
+
+    // --- About Popup Logic ---
+    function openAbout() {
+        document.getElementById("aboutPopup").style.display = "flex";
+    }
+
+    function closeAbout() {
+        document.getElementById("aboutPopup").style.display = "none";
+    }
+</script>
+</body>
+</html>
