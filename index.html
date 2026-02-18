@@ -5,32 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; background: #f4f4f4; margin: 0; padding: 10px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; }
-        button.nav { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #eee; border: none; border-radius: 5px; }
-        h2 { margin: 0; color: #333; font-size: 1.2em; }
-        #syncStatus { font-size: 0.7em; display: block; color: #888; text-align: center; }
+        
+        /* Header & Navigation */
+        .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; gap: 10px; }
+        .nav-group { display: flex; gap: 5px; align-items: center; }
+        button.nav { padding: 10px 15px; font-size: 16px; cursor: pointer; background: #eee; border: none; border-radius: 5px; }
+        button.nav:hover { background: #ddd; }
+        button.special { background-color: #e3f2fd; color: #1565c0; font-weight: bold; }
+        
+        h2 { margin: 0; color: #333; font-size: 1.2em; text-align: center; }
+        #syncStatus { font-size: 0.7em; display: block; color: #888; text-align: center; margin-top: 2px; }
+
+        /* Calendar Grid */
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .day-header { text-align: center; font-weight: bold; padding: 10px 0; color: #555; font-size: 0.8em; }
-        .day-btn { height: 80px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; position: relative; }
-        .day-btn.weekend { background-color: #f9f9f9; color: #777; }
+        
+        /* Day Buttons */
+        .day-btn { height: 80px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; position: relative; color: #333; }
+        
+        /* Weekend Styling - Pale Blue Background, Black Text */
+        .day-btn.weekend { background-color: #e3f2fd; color: #000; border-color: #90caf9; }
+        
         .day-btn.has-event { background-color: #fff9c4; border: 2px solid #fbc02d; color: #d32f2f; }
-        .day-btn.today { border: 2px solid #2196f3; }
-        #popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .popup-content { background: white; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; }
-        textarea { width: 100%; height: 150px; font-size: 16px; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; }
+        .day-btn.today { border: 3px solid #1565c0; } /* Thicker border for today */
+
+        /* Popups (Event & About) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        textarea { width: 100%; height: 150px; font-size: 16px; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; font-family: sans-serif; }
+        
         .btn-save { background: #4CAF50; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; }
-        .btn-close { background: #f44336; color: white; border: none; padding: 5px 10px; float: right; border-radius: 3px; cursor: pointer; }
+        .btn-close { background: #f44336; color: white; border: none; padding: 5px 10px; float: right; border-radius: 3px; cursor: pointer; margin-left: 10px; }
+        
+        /* About Section Text */
+        .about-text { font-size: 0.9em; line-height: 1.5; color: #444; }
+        .about-text h4 { margin-top: 15px; margin-bottom: 5px; color: #222; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <button class="nav" onclick="move(-1)">&#10094;</button>
+    <div class="nav-group">
+        <button class="nav" onclick="move(-1)">&#10094;</button>
+        <button class="nav" onclick="goToToday()">Today</button>
+        <button class="nav" onclick="move(1)">&#10095;</button>
+    </div>
+    
     <div>
         <h2 id="monthTitle">Loading...</h2>
         <span id="syncStatus">Checking connection...</span>
     </div>
-    <button class="nav" onclick="move(1)">&#10095;</button>
+
+    <button class="nav special" onclick="openAbout()">About</button>
 </div>
 
 <div class="grid">
@@ -39,12 +66,28 @@
 
 <div id="calendarGrid" class="grid"></div>
 
-<div id="popup">
-    <div class="popup-content">
+<div id="popup" class="modal">
+    <div class="modal-content">
         <button class="btn-close" onclick="closePopup()">X</button>
         <h3 id="popupDate">Date</h3>
         <textarea id="eventText" placeholder="Details..."></textarea>
         <button class="btn-save" onclick="saveEvent()">SAVE & CLOSE</button>
+    </div>
+</div>
+
+<div id="aboutPopup" class="modal">
+    <div class="modal-content">
+        <button class="btn-close" onclick="closeAbout()">X</button>
+        <h3>About This Calendar</h3>
+        <div class="about-text">
+            <p><strong>How it works:</strong> The code for this calendar lives on <em>GitHub</em> (a place for storing code), but your events are saved in <em>Firebase</em> (a secure database by Google). This allows you and Lesley to see the same events on different devices.</p>
+            
+            <h4>💡 Small Suggestion</h4>
+            <p>As you add history over the years, the database might eventually take a moment longer to load. If that ever happens, the code can be tweaked to load only the "current year" while keeping your history safe in the cloud.</p>
+
+            <h4>💾 Quick Tip</h4>
+            <p>If you ever want a backup of your diary, you can log into the Firebase Console and click "Export JSON". This saves a text file of every entry you've ever made.</p>
+        </div>
     </div>
 </div>
 
@@ -55,121 +98,4 @@
     const firebaseConfig = {
         apiKey: "AIzaSyAEJfSyTNlcm3uKoC8nqKBzkBjfzmNq-0s",
         authDomain: "lesleycalendar-59702.firebaseapp.com",
-        databaseURL: "https://lesleycalendar-59702-default-rtdb.firebaseio.com",
-        projectId: "lesleycalendar-59702",
-        storageBucket: "lesleycalendar-59702.firebasestorage.app",
-        messagingSenderId: "206794990386",
-        appId: "1:206794990386:web:dcda160656a516cd7fad2b"
-    };
-
-    var db;
-    var allEvents = {};
-    var currentView = new Date();
-    var selectedDateId = "";
-
-    // 1. Initialize Firebase
-    try {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.database();
-        
-        // 2. Listen for Data
-        db.ref("events").on("value", (snapshot) => {
-            allEvents = snapshot.val() || {};
-            document.getElementById("syncStatus").innerText = "Cloud Synced ✅";
-            drawCalendar();
-        }, (error) => {
-            console.error(error);
-            document.getElementById("syncStatus").innerText = "Offline Mode (Local)";
-            loadLocal();
-        });
-    } catch(e) {
-        document.getElementById("syncStatus").innerText = "Firebase Error";
-        loadLocal();
-    }
-
-    function loadLocal() {
-        // Pull everything from local storage into our memory object
-        for (let i = 0; i < localStorage.length; i++) {
-            let key = localStorage.key(i);
-            if (key.includes("-")) { // Simple check to ensure it's a date key
-                allEvents[key] = localStorage.getItem(key);
-            }
-        }
-        drawCalendar();
-    }
-
-    function drawCalendar() {
-        var year = currentView.getFullYear();
-        var month = currentView.getMonth();
-        var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        document.getElementById("monthTitle").innerText = monthNames[month] + " " + year;
-
-        var firstDay = new Date(year, month, 1).getDay();
-        var offset = (firstDay === 0) ? 6 : firstDay - 1; 
-        var daysInMonth = new Date(year, month + 1, 0).getDate();
-        
-        var gridHtml = "";
-        for (var i = 0; i < offset; i++) {
-            gridHtml += "<div class='day-btn' style='visibility:hidden'></div>";
-        }
-
-        for (var day = 1; day <= daysInMonth; day++) {
-            var dateId = year + "-" + (month + 1) + "-" + day;
-            var dayOfWeek = new Date(year, month, day).getDay();
-            
-            var classes = "day-btn";
-            if (dayOfWeek === 0 || dayOfWeek === 6) { classes += " weekend"; }
-            
-            var content = allEvents[dateId] || "";
-            if (content.trim() !== "") { classes += " has-event"; }
-            
-            var today = new Date();
-            if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
-                classes += " today";
-            }
-
-            gridHtml += "<button class='" + classes + "' onclick='openPopup(\"" + dateId + "\", " + day + ")'>" + day + "</button>";
-        }
-        document.getElementById("calendarGrid").innerHTML = gridHtml;
-    }
-
-    function move(n) {
-        currentView.setMonth(currentView.getMonth() + n);
-        drawCalendar();
-    }
-
-    function openPopup(id, dayNum) {
-        selectedDateId = id;
-        var monthName = document.getElementById("monthTitle").innerText.split(" ")[0];
-        document.getElementById("popupDate").innerText = dayNum + " " + monthName;
-        document.getElementById("eventText").value = allEvents[id] || "";
-        document.getElementById("popup").style.display = "flex";
-        document.getElementById("eventText").focus();
-    }
-
-    function saveEvent() {
-        var text = document.getElementById("eventText").value;
-        
-        // Save to Memory
-        allEvents[selectedDateId] = text;
-        
-        // Save to LocalStorage (Immediate backup)
-        localStorage.setItem(selectedDateId, text);
-        
-        // Save to Firebase
-        if (db) {
-            db.ref("events/" + selectedDateId).set(text)
-              .then(() => console.log("Saved to Cloud"))
-              .catch((e) => alert("Cloud save failed: " + e.message));
-        }
-        
-        closePopup();
-        drawCalendar();
-    }
-
-    function closePopup() {
-        document.getElementById("popup").style.display = "none";
-    }
-</script>
-</body>
-</html>
+        databaseURL: "https://lesleycalendar-597
