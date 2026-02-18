@@ -7,7 +7,8 @@
         body { font-family: sans-serif; background: #f4f4f4; margin: 0; padding: 10px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; }
         button.nav { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #eee; border: none; border-radius: 5px; }
-        h2 { margin: 0; color: #333; }
+        h2 { margin: 0; color: #333; font-size: 1.2em; }
+        #syncStatus { font-size: 0.7em; display: block; color: #888; text-align: center; }
         .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
         .day-header { text-align: center; font-weight: bold; padding: 10px 0; color: #555; font-size: 0.8em; }
         .day-btn { height: 80px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 18px; font-weight: bold; cursor: pointer; position: relative; }
@@ -24,9 +25,12 @@
 <body>
 
 <div class="header">
-    <button class="nav" onclick="move(-1)">&#10094; Prev</button>
-    <h2 id="monthTitle">Syncing...</h2>
-    <button class="nav" onclick="move(1)">Next &#10095;</button>
+    <button class="nav" onclick="move(-1)">&#10094;</button>
+    <div>
+        <h2 id="monthTitle">Loading...</h2>
+        <span id="syncStatus">Checking connection...</span>
+    </div>
+    <button class="nav" onclick="move(1)">&#10095;</button>
 </div>
 
 <div class="grid">
@@ -55,39 +59,42 @@
         projectId: "lesleycalendar-59702",
         storageBucket: "lesleycalendar-59702.firebasestorage.app",
         messagingSenderId: "206794990386",
-        appId: "1:206794990386:web:dcda160656a516cd7fad2b",
-        measurementId: "G-9ZG3RJLNTC"
+        appId: "1:206794990386:web:dcda160656a516cd7fad2b"
     };
 
-    var dbActive = false;
-    try {
-        firebase.initializeApp(firebaseConfig);
-        var db = firebase.database();
-        dbActive = true;
-    } catch(e) { console.log("Firebase failed to init"); }
-
+    var db;
+    var allEvents = {};
     var currentView = new Date();
     var selectedDateId = "";
-    var allEvents = {};
 
-    // Hybrid Loader
-    if (dbActive) {
-        db.ref("events").on("value", function(snapshot) {
+    // 1. Initialize Firebase
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+        
+        // 2. Listen for Data
+        db.ref("events").on("value", (snapshot) => {
             allEvents = snapshot.val() || {};
+            document.getElementById("syncStatus").innerText = "Cloud Synced ✅";
             drawCalendar();
-        }, function(error) {
-            console.log("DB Blocked. Using Local Storage.");
+        }, (error) => {
+            console.error(error);
+            document.getElementById("syncStatus").innerText = "Offline Mode (Local)";
             loadLocal();
         });
-    } else { loadLocal(); }
-
-    function loadLocal() {
-        // Simple fallback to local memory if Firebase is offline
-        drawCalendar();
+    } catch(e) {
+        document.getElementById("syncStatus").innerText = "Firebase Error";
+        loadLocal();
     }
 
-    function move(n) {
-        currentView.setMonth(currentView.getMonth() + n);
+    function loadLocal() {
+        // Pull everything from local storage into our memory object
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.includes("-")) { // Simple check to ensure it's a date key
+                allEvents[key] = localStorage.getItem(key);
+            }
+        }
         drawCalendar();
     }
 
@@ -113,8 +120,7 @@
             var classes = "day-btn";
             if (dayOfWeek === 0 || dayOfWeek === 6) { classes += " weekend"; }
             
-            // Check Firebase first, then LocalStorage
-            var content = allEvents[dateId] || localStorage.getItem(dateId) || "";
+            var content = allEvents[dateId] || "";
             if (content.trim() !== "") { classes += " has-event"; }
             
             var today = new Date();
@@ -127,19 +133,36 @@
         document.getElementById("calendarGrid").innerHTML = gridHtml;
     }
 
+    function move(n) {
+        currentView.setMonth(currentView.getMonth() + n);
+        drawCalendar();
+    }
+
     function openPopup(id, dayNum) {
         selectedDateId = id;
         var monthName = document.getElementById("monthTitle").innerText.split(" ")[0];
         document.getElementById("popupDate").innerText = dayNum + " " + monthName;
-        document.getElementById("eventText").value = allEvents[id] || localStorage.getItem(id) || "";
+        document.getElementById("eventText").value = allEvents[id] || "";
         document.getElementById("popup").style.display = "flex";
         document.getElementById("eventText").focus();
     }
 
     function saveEvent() {
         var text = document.getElementById("eventText").value;
-        if (dbActive) { db.ref("events/" + selectedDateId).set(text); }
-        localStorage.setItem(selectedDateId, text); // Always save locally too!
+        
+        // Save to Memory
+        allEvents[selectedDateId] = text;
+        
+        // Save to LocalStorage (Immediate backup)
+        localStorage.setItem(selectedDateId, text);
+        
+        // Save to Firebase
+        if (db) {
+            db.ref("events/" + selectedDateId).set(text)
+              .then(() => console.log("Saved to Cloud"))
+              .catch((e) => alert("Cloud save failed: " + e.message));
+        }
+        
         closePopup();
         drawCalendar();
     }
