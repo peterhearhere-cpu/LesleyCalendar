@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesley's Fridge Calendar</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; margin: 10px; background: #f4f4f4; color: #333; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+button { padding: 10px 15px; cursor: pointer; border-radius: 5px; border: 1px solid #bbb; background: #fff; font-weight: bold; font-size: 16px; }
+button:hover { background: #eee; }
+h2 { margin: 0; font-size: 1.4em; color: #d32f2f; } /* A nice red like a wall calendar */
+
+</head>
+<body>
+
+<div class="header">
+<button onclick="changeMonth(-1)">◀ PREV</button>
+<h2 id="monthDisplay">Month Year</h2>
+<button onclick="changeMonth(1)">NEXT ▶</button>
+</div>
+
+<table id="calendar">
+<thead>
+<tr>
+<th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+</tr>
+</thead>
+<tbody id="calendarBody"></tbody>
+</table>
+
+<script>
+let viewDate = new Date();
+
+</script>
+
+</body>
+</html>
