@@ -1,42 +1,141 @@
 <!DOCTYPE html>
-
 <html>
 <head>
-<title>Lesley's Calendar</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 10px; background: #f4f4f4; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: white; padding: 10px; border: 1px solid #ccc; }
-button { padding: 10px; cursor: pointer; font-weight: bold; background: #eee; }
-table { width: 100%; border-collapse: collapse; background: white; table-layout: fixed; border: 2px solid #333; }
-th { background: #ddd; padding: 10px; border: 1px solid #333; height: 30px; }
-td { border: 1px solid #ccc; height: 100px; vertical-align: top; padding: 5px; }
-.day-num { font-weight: bold; color: #333; }
-textarea { width: 95%; height: 70px; border: none; resize: none; font-family: Arial; outline: none; background: transparent; }
-.today { background-color: #ffffcc; border: 2px solid orange !important; }
-</style>
+    <title>Lesley's Calendar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; background: #f4f4f4; margin: 0; padding: 10px; }
+        
+        /* Header controls */
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; }
+        button.nav { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #eee; border: none; border-radius: 5px; }
+        h2 { margin: 0; color: #333; }
+
+        /* The Calendar Grid */
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .day-header { text-align: center; font-weight: bold; padding: 10px 0; color: #555; }
+        
+        /* The Day Buttons */
+        .day-btn { 
+            height: 80px; 
+            background: white; 
+            border: 1px solid #ccc; 
+            border-radius: 5px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            position: relative;
+        }
+        
+        /* Visual Cues */
+        .day-btn.has-event { background-color: #fff9c4; border: 2px solid #fbc02d; color: #d32f2f; }
+        .day-btn.today { border: 2px solid #2196f3; }
+        
+        /* The "Popup" (Modal) */
+        #popup { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .popup-content { background: white; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        textarea { width: 100%; height: 150px; font-size: 16px; padding: 10px; margin: 10px 0; border: 1px solid #ccc; box-sizing: border-box; }
+        .btn-save { background: #4CAF50; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; }
+        .btn-close { background: #f44336; color: white; border: none; padding: 5px 10px; float: right; border-radius: 3px; cursor: pointer; margin-bottom: 10px;}
+    </style>
 </head>
 <body>
 
 <div class="header">
-<button onclick="changeMonth(-1)">PREV</button>
-<h2 id="monthDisplay" onclick="render()">Loading... (Click to Refresh)</h2>
-<button onclick="changeMonth(1)">NEXT</button>
+    <button class="nav" onclick="move(-1)">&#10094; Prev</button>
+    <h2 id="monthTitle">Loading...</h2>
+    <button class="nav" onclick="move(1)">Next &#10095;</button>
 </div>
 
-<table id="calendar">
-<thead>
-<tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-</thead>
-<tbody id="calendarBody">
-<tr><td colspan="7" style="text-align:center; padding:50px;">Waiting for calendar to draw...</td></tr>
-</tbody>
-</table>
+<div class="grid">
+    <div class="day-header">Mon</div><div class="day-header">Tue</div><div class="day-header">Wed</div><div class="day-header">Thu</div><div class="day-header">Fri</div><div class="day-header">Sat</div><div class="day-header">Sun</div>
+</div>
+
+<div id="calendarGrid" class="grid"></div>
+
+<div id="popup">
+    <div class="popup-content">
+        <button class="btn-close" onclick="closePopup()">X</button>
+        <h3 id="popupDate">Date</h3>
+        <textarea id="eventText" placeholder="Type event details here..."></textarea>
+        <button class="btn-save" onclick="saveEvent()">SAVE & CLOSE</button>
+    </div>
+</div>
 
 <script>
-var viewDate = new Date();
+    var currentView = new Date();
+    var selectedDateId = ""; // Stores which day we are currently editing
 
+    function move(n) {
+        currentView.setMonth(currentView.getMonth() + n);
+        drawCalendar();
+    }
+
+    function drawCalendar() {
+        var year = currentView.getFullYear();
+        var month = currentView.getMonth();
+        var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        
+        document.getElementById("monthTitle").innerText = monthNames[month] + " " + year;
+
+        // Calculate Monday start
+        var firstDay = new Date(year, month, 1).getDay();
+        var offset = (firstDay === 0) ? 6 : firstDay - 1; 
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        var gridHtml = "";
+
+        // Empty slots for start of month
+        for (var i = 0; i < offset; i++) {
+            gridHtml += "<div class='day-btn' style='visibility:hidden'></div>";
+        }
+
+        // Draw days
+        for (var day = 1; day <= daysInMonth; day++) {
+            var dateId = year + "-" + month + "-" + day;
+            var savedText = localStorage.getItem(dateId) || "";
+            
+            // Determine classes (is it today? does it have text?)
+            var classes = "day-btn";
+            if (savedText.trim() !== "") { classes += " has-event"; }
+            
+            var today = new Date();
+            if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                classes += " today";
+            }
+
+            // Creating the button
+            gridHtml += "<button class='" + classes + "' onclick='openPopup(\"" + dateId + "\", " + day + ")'>" + day + "</button>";
+        }
+
+        document.getElementById("calendarGrid").innerHTML = gridHtml;
+    }
+
+    // --- POPUP FUNCTIONS ---
+
+    function openPopup(id, dayNum) {
+        selectedDateId = id;
+        var monthName = document.getElementById("monthTitle").innerText.split(" ")[0];
+        document.getElementById("popupDate").innerText = dayNum + " " + monthName;
+        document.getElementById("eventText").value = localStorage.getItem(id) || "";
+        document.getElementById("popup").style.display = "flex";
+        document.getElementById("eventText").focus();
+    }
+
+    function saveEvent() {
+        var text = document.getElementById("eventText").value;
+        localStorage.setItem(selectedDateId, text);
+        closePopup();
+        drawCalendar(); // Re-draw to update the colors
+    }
+
+    function closePopup() {
+        document.getElementById("popup").style.display = "none";
+    }
+
+    // Initial draw
+    drawCalendar();
 </script>
 
 </body>
 </html>
-
